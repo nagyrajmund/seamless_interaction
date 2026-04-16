@@ -639,7 +639,7 @@ class SeamlessInteractionFS:
         paths.extend(
             [
                 f"{base_url}/{label}/{split}/audio/{file_id}.wav",
-                f"{base_url}/{label}/{split}/video/{file_id}.mp4",
+                # f"{base_url}/{label}/{split}/video/{file_id}.mp4",
             ]
         )
 
@@ -647,9 +647,9 @@ class SeamlessInteractionFS:
         for feature_group, features in ALL_FEATURES.items():
             if feature_group in [
                 "smplh",
-                "boxes_and_keypoints",
-                "movement",
-                "movement_v4",
+                # "boxes_and_keypoints",
+                # "movement",
+                # "movement_v4",
             ]:
                 for feature in features:
                     paths.append(
@@ -809,8 +809,13 @@ class SeamlessInteractionFS:
         batch: int = 0,
         local_dir: str | None = None,
         extract: bool = True,
+        member_filter: list[str] | None = None,
     ) -> tuple[bool, str]:
-        """Download and optionally extract a tar archive from HuggingFace."""
+        """Download and optionally extract a tar archive from HuggingFace.
+
+        :param member_filter: If provided, only extract tar members whose paths contain
+            at least one of these substrings (e.g. ["npz", ".wav", ".jsonl", ".json"]).
+        """
         if local_dir is None:
             local_dir = self.config.local_dir
         if local_dir is None:
@@ -849,7 +854,17 @@ class SeamlessInteractionFS:
                 logger.info(f"Extracting {local_tar_path} to {extract_dir}")
                 try:
                     with tarfile.open(local_tar_path, "r") as tar:
-                        tar.extractall(extract_dir)
+                        if member_filter:
+                            members = [
+                                m for m in tar.getmembers()
+                                if any(pat in m.name for pat in member_filter)
+                            ]
+                            logger.info(
+                                f"Filtering to {len(members)} members matching {member_filter}"
+                            )
+                            tar.extractall(extract_dir, members=members)
+                        else:
+                            tar.extractall(extract_dir)
                     # remove the tar file
                     os.remove(local_tar_path)
                     return True, extract_dir
@@ -868,8 +883,13 @@ class SeamlessInteractionFS:
         local_dir: str | None = None,
         num_workers: int | None = None,
         archive_list: list[int] | None = None,
+        member_filter: list[str] | None = None,
     ) -> bool:
-        """Download batch(es) from HuggingFace with parallel processing."""
+        """Download batch(es) from HuggingFace with parallel processing.
+
+        :param member_filter: If provided, only extract tar members whose paths contain
+            at least one of these substrings (e.g. ["npz", ".wav", ".jsonl", ".json"]).
+        """
         if local_dir is None:
             local_dir = self.config.local_dir
         if num_workers is None:
@@ -907,6 +927,7 @@ class SeamlessInteractionFS:
                         batch=batch,
                         local_dir=local_dir,
                         extract=True,
+                        member_filter=member_filter,
                     )
                     results = pool.map(download_func, archives)
                 finally:

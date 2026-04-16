@@ -79,6 +79,44 @@ def download_different_splits():
     print("✅ Downloaded samples from different splits")
 
 
+def download_whole_dataset_filtered(
+    member_filter: list[str] | None = None,
+) -> None:
+    """
+    Download the complete dataset (~27TB) but only extract selected file types.
+
+    :param member_filter: Substrings to match against tar member paths.
+        Only matching files are extracted. Defaults to ["npz", ".wav", ".jsonl", ".json"].
+
+    ⚠️ CAUTION: This still downloads every tar archive (full bandwidth) but
+    only keeps the filtered files on disk, saving significant storage.
+    """
+    if member_filter is None:
+        member_filter = ["npz", ".wav", ".jsonl", ".json"]  # Default filter for key data files
+
+    labels = ["improvised", "naturalistic"]
+    splits = ["train", "dev", "test"]
+
+    confirm = input(
+        f"Download entire dataset (~27TB) keeping only {member_filter}? (y/n): "
+    )
+    if confirm not in ["y", "Y", "yes", "Yes", "YES"]:
+        print("Download cancelled.")
+        return
+
+    for label in labels:
+        for split in splits:
+            print(f"Downloading {label}/{split} (filter: {member_filter})...")
+            config = DatasetConfig(label=label, num_workers=16)
+            fs = SeamlessInteractionFS(config=config)
+            fs.download_batch_from_hf(
+                split=split,
+                batch_idx=None,  # Download all batches
+                member_filter=member_filter,
+            )
+
+    print(f"✅ Downloaded complete dataset (filtered: {member_filter})")
+
 def download_whole_dataset():
     """
     Download the complete dataset (~27TB).
@@ -128,13 +166,15 @@ def main():
     print("3. Multiple batches (~150GB+)")
     print("4. Different splits (improvised/naturalistic, train/dev/test)")
     print("5. Whole dataset (~27TB)")
+    print("6. Whole dataset, smplh + .wav + .jsonl only")
 
     # Uncomment desired download scenario:
-    download_1gb_sample_archive()
+    # download_1gb_sample_archive()
     # download_single_batch()
     # download_multiple_batches()
     # download_different_splits()
-    # download_whole_dataset()  # ⚠️ CAUTION: Very large!
+    # download_whole_dataset()  # ⚠️ CAUTION: Very large, all files!
+    download_whole_dataset_filtered()  # ⚠️ CAUTION: Very large, .npz/.wav/.jsonl/.json only!
 
 
 if __name__ == "__main__":
